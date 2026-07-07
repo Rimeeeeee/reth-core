@@ -493,6 +493,11 @@ impl<B: Block> BlockHeader for RecoveredBlock<B> {
     }
 
     #[inline]
+    fn wam_root(&self) -> Option<B256> {
+        self.header().wam_root()
+    }
+
+    #[inline]
     fn extra_data(&self) -> &Bytes {
         self.header().extra_data()
     }

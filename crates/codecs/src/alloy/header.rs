@@ -63,6 +63,7 @@ pub(crate) struct HeaderExt {
     requests_hash: Option<B256>,
     block_access_list_hash: Option<B256>,
     slot_number: Option<u64>,
+    wam_root: Option<B256>,
 }
 
 impl HeaderExt {
@@ -70,9 +71,10 @@ impl HeaderExt {
     ///
     /// Required since [`Header`] uses `Option<HeaderExt>` as a field.
     const fn into_option(self) -> Option<Self> {
-        if self.requests_hash.is_some() ||
-            self.block_access_list_hash.is_some() ||
-            self.slot_number.is_some()
+        if self.requests_hash.is_some()
+            || self.block_access_list_hash.is_some()
+            || self.slot_number.is_some()
+            || self.wam_root.is_some()
         {
             Some(self)
         } else {
@@ -90,6 +92,7 @@ impl Compact for AlloyHeader {
             requests_hash: self.requests_hash,
             block_access_list_hash: self.block_access_list_hash,
             slot_number: self.slot_number,
+            wam_root: self.wam_root,
         };
 
         let header = Header {
@@ -146,6 +149,7 @@ impl Compact for AlloyHeader {
                 .as_ref()
                 .and_then(|h| h.block_access_list_hash),
             slot_number: header.extra_fields.as_ref().and_then(|h| h.slot_number),
+            wam_root: header.extra_fields.as_ref().and_then(|h| h.wam_root),
             extra_data: header.extra_data,
         };
         (alloy_header, buf)
@@ -211,6 +215,7 @@ mod tests {
             requests_hash: Some(B256::random()),
             block_access_list_hash: None,
             slot_number: None,
+            wam_root: None,
         });
 
         let mut encoded_header = vec![];

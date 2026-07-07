@@ -21,13 +21,13 @@ reth-zstd-compressors = { version = "0.5.2", path = "crates/zstd-compressors", d
 # eth/alloy
 alloy-primitives = { version = "1.5.6", default-features = false, features = ["map-foldhash"] }
 alloy-rlp = { version = "0.3.13", default-features = false, features = ["core-net"] }
-alloy-rpc-types-eth = { version = "2.0", default-features = false }
+alloy-rpc-types-eth = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289", default-features = false }
 alloy-trie = { version = "0.9.4", default-features = false }
-alloy-consensus = { version = "2.0", default-features = false }
-alloy-eips = { version = "2.0", default-features = false }
-alloy-network = { version = "2.0", default-features = false }
-alloy-signer = { version = "2.0", default-features = false }
-alloy-genesis = { version = "2.0", default-features = false }
+alloy-consensus = { version = "2.1.0", default-features = false }
+alloy-eips = { version = "2.1.0", default-features = false }
+alloy-network = { version = "2.1.0", default-features = false }
+alloy-signer = { version = "2.1.0", default-features = false }
+alloy-genesis = { version = "2.1.0", default-features = false }
 revm-primitives = { version = "41.0.0", default-features = false }
 revm-bytecode = { version = "41.0.0", default-features = false }
 revm-state = { version = "41.0.0", default-features = false }
@@ -150,3 +150,13 @@ redundant_pub_crate = "allow"
 significant_drop_in_scrutinee = "allow"
 significant_drop_tightening = "allow"
 too_long_first_doc_paragraph = "allow"
+
+[patch.crates-io]
+alloy-consensus = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-consensus-any = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-network = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-network-primitives = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-serde = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
+alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", branch = "eip-8289" }
