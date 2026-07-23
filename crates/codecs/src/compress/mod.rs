@@ -142,7 +142,9 @@ impl_compression_for_compact!(Bytes);
 
 #[cfg(feature = "alloy")]
 mod alloy {
-    use alloy_consensus::{EthereumReceipt, EthereumTxEnvelope, Header, TxEip4844, TxType};
+    use alloy_consensus::{
+        EthereumReceipt, EthereumTxEnvelope, Header, ReceiptEnvelope, TxEip4844, TxType,
+    };
     use alloy_genesis::GenesisAccount;
     use alloy_primitives::Log;
     use alloy_trie::BranchNodeCompact;
@@ -156,6 +158,7 @@ mod alloy {
         BranchNodeCompact,
         GenesisAccount,
         EthereumReceipt<T>,
+        ReceiptEnvelope,
         TransactionSigned
     );
 }
