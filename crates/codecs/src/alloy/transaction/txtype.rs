@@ -3,6 +3,7 @@
 use crate::txtype::{COMPACT_EXTENDED_IDENTIFIER_FLAG, COMPACT_IDENTIFIER_EIP1559, COMPACT_IDENTIFIER_EIP2930, COMPACT_IDENTIFIER_LEGACY};
 use alloy_consensus::constants::{EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID};
 use alloy_consensus::TxType;
+use alloy_eips::eip8141::constants::FRAME_TX_TYPE;
 
 impl crate::Compact for TxType {
     fn to_compact<B>(&self, buf: &mut B) -> usize
@@ -23,6 +24,10 @@ impl crate::Compact for TxType {
                 buf.put_u8(EIP7702_TX_TYPE_ID);
                 COMPACT_EXTENDED_IDENTIFIER_FLAG
             }
+            Self::Eip8141 => {
+                buf.put_u8(FRAME_TX_TYPE);
+                COMPACT_EXTENDED_IDENTIFIER_FLAG
+            }
         }
     }
 
@@ -41,6 +46,7 @@ impl crate::Compact for TxType {
                     match extended_identifier {
                         EIP4844_TX_TYPE_ID => Self::Eip4844,
                         EIP7702_TX_TYPE_ID => Self::Eip7702,
+                        FRAME_TX_TYPE => Self::Eip8141,
                         _ => panic!("Unsupported TxType identifier: {extended_identifier}"),
                     }
                 }
@@ -56,8 +62,8 @@ mod tests {
     use super::*;
     use rstest::rstest;
     
-    use alloy_consensus::constants::{EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID};
     use crate::Compact;
+    use alloy_consensus::constants::{EIP4844_TX_TYPE_ID, EIP7702_TX_TYPE_ID};
 
 
     #[rstest]
@@ -66,6 +72,7 @@ mod tests {
     #[case(TxType::Eip1559, COMPACT_IDENTIFIER_EIP1559, vec![])]
     #[case(TxType::Eip4844, COMPACT_EXTENDED_IDENTIFIER_FLAG, vec![EIP4844_TX_TYPE_ID])]
     #[case(TxType::Eip7702, COMPACT_EXTENDED_IDENTIFIER_FLAG, vec![EIP7702_TX_TYPE_ID])]
+    #[case(TxType::Eip8141, COMPACT_EXTENDED_IDENTIFIER_FLAG, vec![FRAME_TX_TYPE])]
     fn test_txtype_to_compact(
         #[case] tx_type: TxType,
         #[case] expected_identifier: usize,
@@ -84,6 +91,7 @@ mod tests {
     #[case(TxType::Eip1559, COMPACT_IDENTIFIER_EIP1559, vec![])]
     #[case(TxType::Eip4844, COMPACT_EXTENDED_IDENTIFIER_FLAG, vec![EIP4844_TX_TYPE_ID])]
     #[case(TxType::Eip7702, COMPACT_EXTENDED_IDENTIFIER_FLAG, vec![EIP7702_TX_TYPE_ID])]
+    #[case(TxType::Eip8141, COMPACT_EXTENDED_IDENTIFIER_FLAG, vec![FRAME_TX_TYPE])]
     fn test_txtype_from_compact(
         #[case] expected_type: TxType,
         #[case] identifier: usize,

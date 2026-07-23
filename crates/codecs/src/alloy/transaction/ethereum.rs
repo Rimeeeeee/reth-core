@@ -1,10 +1,13 @@
 use crate::{Compact, Vec};
 use alloy_consensus::{
     transaction::RlpEcdsaEncodableTx, EthereumTxEnvelope, Signed, Transaction, TxEip1559,
-    TxEip2930, TxEip7702, TxLegacy, TxType,
+    TxEip2930, TxEip7702, TxEip8141, TxLegacy, TxType,
 };
-use alloy_primitives::Signature;
+use alloy_primitives::{Sealable, Signature, U256};
 use bytes::{Buf, BufMut};
+
+/// Compact envelope marker for transactions without an outer ECDSA signature.
+const UNSIGNED_TRANSACTION_IDENTIFIER: u8 = u8::MAX;
 
 /// A trait for extracting transaction without type and signature and serializing it using
 /// [`Compact`] encoding.
@@ -53,6 +56,7 @@ impl<Eip4844: Compact + Transaction> ToTxCompact for EthereumTxEnvelope<Eip4844>
             Self::Eip1559(tx) => tx.tx().to_compact(buf),
             Self::Eip4844(tx) => tx.tx().to_compact(buf),
             Self::Eip7702(tx) => tx.tx().to_compact(buf),
+            Self::Eip8141(tx) => tx.inner().to_compact(buf),
         };
     }
 }
@@ -87,6 +91,10 @@ impl<Eip4844: Compact + Transaction> FromTxCompact for EthereumTxEnvelope<Eip484
                 let tx = Signed::new_unhashed(tx, signature);
                 (Self::Eip7702(tx), buf)
             }
+            TxType::Eip8141 => {
+                let (tx, buf) = TxEip8141::from_compact(buf, buf.len());
+                (Self::Eip8141(tx.seal_slow()), buf)
+            }
         }
     }
 }
@@ -98,6 +106,11 @@ pub trait Envelope: FromTxCompact<TxType: Compact> {
 
     ///Returns the tx type
     fn tx_type(&self) -> Self::TxType;
+
+    /// Returns whether this transaction has no outer ECDSA signature.
+    fn is_unsigned(&self) -> bool {
+        false
+    }
 }
 
 impl<Eip4844: Compact + Transaction + RlpEcdsaEncodableTx> Envelope
@@ -109,6 +122,10 @@ impl<Eip4844: Compact + Transaction + RlpEcdsaEncodableTx> Envelope
 
     fn tx_type(&self) -> Self::TxType {
         Self::tx_type(self)
+    }
+
+    fn is_unsigned(&self) -> bool {
+        self.is_eip8141()
     }
 }
 
@@ -134,6 +151,18 @@ impl<T: Envelope + ToTxCompact + Transaction + Send + Sync> CompactEnvelope for 
         B: BufMut + AsMut<[u8]>,
     {
         let start = buf.as_mut().len();
+
+        if self.is_unsigned() {
+            buf.put_u8(UNSIGNED_TRANSACTION_IDENTIFIER);
+            let tx_bits = self.tx_type().to_compact(buf);
+            assert_eq!(
+                tx_bits,
+                crate::txtype::COMPACT_EXTENDED_IDENTIFIER_FLAG,
+                "unsigned transaction type must use the extended compact identifier"
+            );
+            self.to_tx_compact(buf);
+            return buf.as_mut().len() - start
+        }
 
         // Placeholder for bitflags.
         // The first byte uses 4 bits as flags: IsCompressed[1bit], TxType[2bits], Signature[1bit]
@@ -170,6 +199,13 @@ impl<T: Envelope + ToTxCompact + Transaction + Send + Sync> CompactEnvelope for 
     fn from_compact(mut buf: &[u8], _len: usize) -> (Self, &[u8]) {
         let flags = buf.get_u8() as usize;
 
+        if flags == UNSIGNED_TRANSACTION_IDENTIFIER as usize {
+            let (tx_type, buf) =
+                T::TxType::from_compact(buf, crate::txtype::COMPACT_EXTENDED_IDENTIFIER_FLAG);
+            let placeholder_signature = Signature::new(U256::ZERO, U256::ZERO, false);
+            return Self::from_tx_compact(buf, tx_type, placeholder_signature)
+        }
+
         let sig_bit = flags & 1;
         let tx_bits = (flags & 0b110) >> 1;
         let zstd_bit = flags >> 3;
@@ -204,5 +240,34 @@ impl<Eip4844: Compact + RlpEcdsaEncodableTx + Transaction + Send + Sync> Compact
 
     fn from_compact(buf: &[u8], len: usize) -> (Self, &[u8]) {
         <Self as CompactEnvelope>::from_compact(buf, len)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_consensus::{TxEip4844, TxEip8141};
+    use alloy_primitives::Address;
+
+    #[test]
+    fn unsigned_frame_envelope_roundtrip() {
+        let tx: EthereumTxEnvelope<TxEip4844> = EthereumTxEnvelope::Eip8141(
+            TxEip8141 {
+                chain_id: 1,
+                nonce: 7,
+                sender: Address::repeat_byte(0x11),
+                ..Default::default()
+            }
+            .seal_slow(),
+        );
+        let mut compact = Vec::new();
+
+        let len = Compact::to_compact(&tx, &mut compact);
+        let (decoded, remaining) =
+            <EthereumTxEnvelope<TxEip4844> as Compact>::from_compact(&compact, len);
+
+        assert_eq!(compact.first(), Some(&UNSIGNED_TRANSACTION_IDENTIFIER));
+        assert_eq!(decoded, tx);
+        assert!(remaining.is_empty());
     }
 }
