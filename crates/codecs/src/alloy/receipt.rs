@@ -151,7 +151,7 @@ impl Compact for AlloyReceiptEnvelope {
             AlloyReceiptEnvelope::Eip1559(receipt) => standard(TxType::Eip1559, &receipt.receipt).to_compact(buf),
             AlloyReceiptEnvelope::Eip4844(receipt) => standard(TxType::Eip4844, &receipt.receipt).to_compact(buf),
             AlloyReceiptEnvelope::Eip7702(receipt) => standard(TxType::Eip7702, &receipt.receipt).to_compact(buf),
-            AlloyReceiptEnvelope::Eip8141(payload) => AlloyEthereumReceipt::Frame(payload.clone()).to_compact(buf),
+            AlloyReceiptEnvelope::Eip8141(payload) => AlloyEthereumReceipt::<TxType>::Frame(payload.clone()).to_compact(buf),
         }
     }
 
