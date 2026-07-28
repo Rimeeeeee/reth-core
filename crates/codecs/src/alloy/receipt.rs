@@ -49,17 +49,26 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
     where
         B: bytes::BufMut + AsMut<[u8]>,
     {
+        if let AlloyEthereumReceipt::Frame(payload) = self {
+            let envelope = AlloyReceiptEnvelope::Eip8141(payload.clone());
+            let mut encoded = Vec::with_capacity(envelope.encode_2718_len());
+            envelope.encode_2718(&mut encoded);
+            buf.put_u8(EIP8141_COMPACT_IDENTIFIER);
+            buf.put_slice(&encoded);
+            return encoded.len() + 1
+        }
+        let AlloyEthereumReceipt::Standard(receipt) = self else { unreachable!() };
         let mut flags = ReceiptFlags::default();
         let mut total_length = 0;
         let mut buffer = bytes::BytesMut::new();
 
-        let tx_type_len = self.tx_type.to_compact(&mut buffer);
+        let tx_type_len = receipt.tx_type.to_compact(&mut buffer);
         flags.set_tx_type_len(tx_type_len as u8);
-        let success_len = self.success.to_compact(&mut buffer);
+        let success_len = receipt.success.to_compact(&mut buffer);
         flags.set_success_len(success_len as u8);
-        let cumulative_gas_used_len = self.cumulative_gas_used.to_compact(&mut buffer);
+        let cumulative_gas_used_len = receipt.cumulative_gas_used.to_compact(&mut buffer);
         flags.set_cumulative_gas_used_len(cumulative_gas_used_len as u8);
-        self.logs.to_compact(&mut buffer);
+        receipt.logs.to_compact(&mut buffer);
 
         let zstd = buffer.len() > 7;
         if zstd {
@@ -81,6 +90,16 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
     }
 
     fn from_compact(buf: &[u8], _len: usize) -> (Self, &[u8]) {
+        if buf.first() == Some(&EIP8141_COMPACT_IDENTIFIER) {
+            let mut encoded = &buf[1..];
+            let envelope = AlloyReceiptEnvelope::decode_2718(&mut encoded)
+                .expect("invalid EIP-8141 receipt in compact database encoding");
+            let consumed = buf.len() - encoded.len();
+            let AlloyReceiptEnvelope::Eip8141(payload) = envelope else {
+                panic!("compact receipt discriminator contained another type")
+            };
+            return (Self::Frame(payload), &buf[consumed..])
+        }
         let (flags, mut buf) = ReceiptFlags::from(buf);
         if flags.__zstd() != 0 {
             reth_zstd_compressors::with_receipt_decompressor(|decompressor| {
@@ -95,7 +114,7 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
                     u64::from_compact(buf, flags.cumulative_gas_used_len() as usize);
                 buf = new_buf;
                 let (logs, _) = Vec::<Log>::from_compact(buf, buf.len());
-                (Self { tx_type, success, cumulative_gas_used, logs }, original_buf)
+                (Self::Standard(alloy_consensus::EthereumReceiptData { tx_type, success, cumulative_gas_used, logs }), original_buf)
             })
         } else {
             let (tx_type, new_buf) = T::from_compact(buf, flags.tx_type_len() as usize);
@@ -107,7 +126,7 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
             buf = new_buf;
             let (logs, new_buf) = Vec::<Log>::from_compact(buf, buf.len());
             buf = new_buf;
-            let obj = Self { tx_type, success, cumulative_gas_used, logs };
+            let obj = Self::Standard(alloy_consensus::EthereumReceiptData { tx_type, success, cumulative_gas_used, logs });
             (obj, buf)
         }
     }
@@ -126,8 +145,14 @@ impl Compact for AlloyReceiptEnvelope {
             return encoded.len() + 1
         }
 
-        let receipt: AlloyEthereumReceipt<TxType> = self.clone().into();
-        receipt.to_compact(buf)
+        match self {
+            AlloyReceiptEnvelope::Legacy(receipt) => standard(TxType::Legacy, &receipt.receipt).to_compact(buf),
+            AlloyReceiptEnvelope::Eip2930(receipt) => standard(TxType::Eip2930, &receipt.receipt).to_compact(buf),
+            AlloyReceiptEnvelope::Eip1559(receipt) => standard(TxType::Eip1559, &receipt.receipt).to_compact(buf),
+            AlloyReceiptEnvelope::Eip4844(receipt) => standard(TxType::Eip4844, &receipt.receipt).to_compact(buf),
+            AlloyReceiptEnvelope::Eip7702(receipt) => standard(TxType::Eip7702, &receipt.receipt).to_compact(buf),
+            AlloyReceiptEnvelope::Eip8141(payload) => AlloyEthereumReceipt::Frame(payload.clone()).to_compact(buf),
+        }
     }
 
     fn from_compact(buf: &[u8], len: usize) -> (Self, &[u8]) {
@@ -149,12 +174,20 @@ impl Compact for AlloyReceiptEnvelope {
         }
 
         let (receipt, buf) = AlloyEthereumReceipt::<TxType>::from_compact(buf, len);
-        assert!(
-            !matches!(receipt.tx_type, TxType::Eip8141),
-            "invalid legacy compact EIP-8141 receipt"
-        );
+        let AlloyEthereumReceipt::Standard(receipt) = receipt else {
+            panic!("invalid legacy compact EIP-8141 receipt")
+        };
         (receipt.into(), buf)
     }
+}
+
+fn standard(tx_type: TxType, receipt: &alloy_consensus::Receipt) -> AlloyEthereumReceipt {
+    AlloyEthereumReceipt::Standard(alloy_consensus::EthereumReceiptData {
+        tx_type,
+        success: receipt.status.coerce_status(),
+        cumulative_gas_used: receipt.cumulative_gas_used,
+        logs: receipt.logs.clone(),
+    })
 }
 
 #[cfg(test)]
