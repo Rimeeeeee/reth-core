@@ -49,7 +49,7 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
     where
         B: bytes::BufMut + AsMut<[u8]>,
     {
-        if let AlloyEthereumReceipt::Frame(payload) = self {
+        if let AlloyEthereumReceipt::Frame { payload, .. } = self {
             let envelope = AlloyReceiptEnvelope::Eip8141(payload.clone());
             let mut encoded = Vec::with_capacity(envelope.encode_2718_len());
             envelope.encode_2718(&mut encoded);
@@ -98,7 +98,12 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
             let AlloyReceiptEnvelope::Eip8141(payload) = envelope else {
                 panic!("compact receipt discriminator contained another type")
             };
-            return (Self::Frame(payload), &buf[consumed..])
+            let logs = payload
+                .frame_receipts
+                .iter()
+                .flat_map(|receipt| receipt.logs.iter().cloned())
+                .collect();
+            return (Self::Frame { payload, logs }, &buf[consumed..])
         }
         let (flags, mut buf) = ReceiptFlags::from(buf);
         if flags.__zstd() != 0 {
@@ -151,7 +156,15 @@ impl Compact for AlloyReceiptEnvelope {
             AlloyReceiptEnvelope::Eip1559(receipt) => standard(TxType::Eip1559, &receipt.receipt).to_compact(buf),
             AlloyReceiptEnvelope::Eip4844(receipt) => standard(TxType::Eip4844, &receipt.receipt).to_compact(buf),
             AlloyReceiptEnvelope::Eip7702(receipt) => standard(TxType::Eip7702, &receipt.receipt).to_compact(buf),
-            AlloyReceiptEnvelope::Eip8141(payload) => AlloyEthereumReceipt::<TxType>::Frame(payload.clone()).to_compact(buf),
+            AlloyReceiptEnvelope::Eip8141(payload) => {
+                let logs = payload
+                    .frame_receipts
+                    .iter()
+                    .flat_map(|receipt| receipt.logs.iter().cloned())
+                    .collect();
+                AlloyEthereumReceipt::<TxType>::Frame { payload: payload.clone(), logs }
+                    .to_compact(buf)
+            }
         }
     }
 
