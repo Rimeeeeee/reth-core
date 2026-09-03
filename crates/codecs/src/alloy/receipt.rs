@@ -50,7 +50,7 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
         B: bytes::BufMut + AsMut<[u8]>,
     {
         if let AlloyEthereumReceipt::Frame { payload, .. } = self {
-            let envelope = AlloyReceiptEnvelope::Eip8141(payload.clone());
+            let envelope = AlloyReceiptEnvelope::Eip8141(payload.clone().into());
             let mut encoded = Vec::with_capacity(envelope.encode_2718_len());
             envelope.encode_2718(&mut encoded);
             buf.put_u8(EIP8141_COMPACT_IDENTIFIER);
@@ -98,6 +98,7 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
             let AlloyReceiptEnvelope::Eip8141(payload) = envelope else {
                 panic!("compact receipt discriminator contained another type")
             };
+            let (payload, _) = payload.into_parts();
             return (frame(payload), &buf[consumed..])
         }
         let (flags, mut buf) = ReceiptFlags::from(buf);
@@ -152,7 +153,7 @@ impl Compact for AlloyReceiptEnvelope {
             AlloyReceiptEnvelope::Eip4844(receipt) => standard(TxType::Eip4844, &receipt.receipt).to_compact(buf),
             AlloyReceiptEnvelope::Eip7702(receipt) => standard(TxType::Eip7702, &receipt.receipt).to_compact(buf),
             AlloyReceiptEnvelope::Eip8141(payload) => {
-                frame::<TxType>(payload.clone()).to_compact(buf)
+                frame::<TxType>(payload.payload().clone()).to_compact(buf)
             }
         }
     }
@@ -179,7 +180,11 @@ impl Compact for AlloyReceiptEnvelope {
         let AlloyEthereumReceipt::Standard(receipt) = receipt else {
             panic!("invalid legacy compact EIP-8141 receipt")
         };
-        (receipt.into(), buf)
+        (
+            AlloyReceiptEnvelope::try_from(receipt)
+                .expect("standard receipt conversion cannot fail"),
+            buf,
+        )
     }
 }
 
