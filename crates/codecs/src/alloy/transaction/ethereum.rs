@@ -101,22 +101,22 @@ impl<Eip4844: Compact + Transaction> FromTxCompact for EthereumTxEnvelope<Eip484
 
 /// A trait for types convertible from a compact transaction type.
 pub trait Envelope: FromTxCompact<TxType: Compact> {
-    ///Returns the signature
-    fn signature(&self) -> &Signature;
+    /// Returns the outer signature, or `None` for frame transactions.
+    fn signature(&self) -> Option<&Signature>;
 
     ///Returns the tx type
     fn tx_type(&self) -> Self::TxType;
 
     /// Returns whether this transaction has no outer ECDSA signature.
     fn is_unsigned(&self) -> bool {
-        false
+        self.signature().is_none()
     }
 }
 
 impl<Eip4844: Compact + Transaction + RlpEcdsaEncodableTx> Envelope
     for EthereumTxEnvelope<Eip4844>
 {
-    fn signature(&self) -> &Signature {
+    fn signature(&self) -> Option<&Signature> {
         Self::signature(self)
     }
 
@@ -152,7 +152,7 @@ impl<T: Envelope + ToTxCompact + Transaction + Send + Sync> CompactEnvelope for 
     {
         let start = buf.as_mut().len();
 
-        if self.is_unsigned() {
+        let Some(signature) = self.signature() else {
             buf.put_u8(UNSIGNED_TRANSACTION_IDENTIFIER);
             let tx_bits = self.tx_type().to_compact(buf);
             assert_eq!(
@@ -162,13 +162,13 @@ impl<T: Envelope + ToTxCompact + Transaction + Send + Sync> CompactEnvelope for 
             );
             self.to_tx_compact(buf);
             return buf.as_mut().len() - start
-        }
+        };
 
         // Placeholder for bitflags.
         // The first byte uses 4 bits as flags: IsCompressed[1bit], TxType[2bits], Signature[1bit]
         buf.put_u8(0);
 
-        let sig_bit = self.signature().to_compact(buf) as u8;
+        let sig_bit = signature.to_compact(buf) as u8;
         let zstd_bit = self.input().len() >= 32;
 
         let tx_bits = if zstd_bit {
