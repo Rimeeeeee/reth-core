@@ -28,9 +28,9 @@ alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", rev = "c395a28b8f2146
 alloy-network = { git = "https://github.com/Rimeeeeee/alloy", rev = "c395a28b8f2146245af3805faa05ad00c9d22864", version = "2.4.1", default-features = false }
 alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "c395a28b8f2146245af3805faa05ad00c9d22864", version = "2.4.1", default-features = false }
 alloy-genesis = { version = "2.4.1", default-features = false }
-revm-primitives = { git = "https://github.com/Soubhik-10/revm", rev = "a72606f056907ae4cea35bb93ae70761f486387e", version = "43.0.0", default-features = false }
-revm-bytecode = { git = "https://github.com/Soubhik-10/revm", rev = "a72606f056907ae4cea35bb93ae70761f486387e", version = "43.0.0", default-features = false }
-revm-state = { git = "https://github.com/Soubhik-10/revm", rev = "a72606f056907ae4cea35bb93ae70761f486387e", version = "43.0.0", default-features = false }
+revm-primitives = { git = "https://github.com/Soubhik-10/revm", rev = "50a0c579fa95d087f75c4a470f9ec07db97c9ae3", version = "43.0.0", default-features = false }
+revm-bytecode = { git = "https://github.com/Soubhik-10/revm", rev = "50a0c579fa95d087f75c4a470f9ec07db97c9ae3", version = "43.0.0", default-features = false }
+revm-state = { git = "https://github.com/Soubhik-10/revm", rev = "50a0c579fa95d087f75c4a470f9ec07db97c9ae3", version = "43.0.0", default-features = false }
 
 # crypto
 secp256k1 = { version = "0.30", default-features = false, features = ["global-context", "recovery"] }
