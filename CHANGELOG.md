@@ -5,11 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2](https://github.com/paradigmxyz/reth-core/releases/tag/v0.8.2) - 2026-09-29
+
+### Dependencies
+
+- Bump gh-actions to d5402286 ([#58](https://github.com/paradigmxyz/reth-core/issues/58))
+- [deps] Bump quanta to 0.13 ([#56](https://github.com/paradigmxyz/reth-core/issues/56))
+
+### Features
+
+- [primitives-traits] Add Account::new and with_extension ([#60](https://github.com/paradigmxyz/reth-core/issues/60))
+- [primitives-traits] Impl Error for AccountExtensionsUnsupported ([#59](https://github.com/paradigmxyz/reth-core/issues/59))
+
+### Miscellaneous Tasks
+
+- [ci] Migrate deny and refresh gh-actions ([#55](https://github.com/paradigmxyz/reth-core/issues/55))
+- Update gh-actions and deny workflow pins ([#57](https://github.com/paradigmxyz/reth-core/issues/57))
+- Remove alloy-genesis git patch ([#54](https://github.com/paradigmxyz/reth-core/issues/54))
+
 ## [0.8.1](https://github.com/paradigmxyz/reth-core/releases/tag/v0.8.1) - 2026-09-24
 
 ### Bug Fixes
 
 - [rpc] Preserve block size in responses ([#53](https://github.com/paradigmxyz/reth-core/issues/53))
+
+### Miscellaneous Tasks
+
+- Release 0.8.1
 
 ## [0.8.0](https://github.com/paradigmxyz/reth-core/releases/tag/v0.8.0) - 2026-09-24
 
