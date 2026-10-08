@@ -29,9 +29,9 @@ alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", rev = "4f840608305d88
 alloy-network = { git = "https://github.com/Rimeeeeee/alloy", rev = "4f840608305d88164248ac2a7e0caf05c2e0ea0c", version = "2.4.1", default-features = false }
 alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "4f840608305d88164248ac2a7e0caf05c2e0ea0c", version = "2.4.1", default-features = false }
 alloy-genesis = { version = "2.5.0", default-features = false }
-revm-primitives = { git = "https://github.com/Rimeeeeee/revm", rev = "613fd7fd0c1300d3409e213183ace0f9cfc660f5", version = "43.0.0", default-features = false }
-revm-bytecode = { git = "https://github.com/Rimeeeeee/revm", rev = "613fd7fd0c1300d3409e213183ace0f9cfc660f5", version = "43.0.0", default-features = false }
-revm-state = { git = "https://github.com/Rimeeeeee/revm", rev = "613fd7fd0c1300d3409e213183ace0f9cfc660f5", version = "43.0.0", default-features = false }
+revm-primitives = { git = "https://github.com/Rimeeeeee/revm", rev = "693f8320e82cd8d013b9f9d4af70cacdfae6eff2", version = "43.0.0", default-features = false }
+revm-bytecode = { git = "https://github.com/Rimeeeeee/revm", rev = "693f8320e82cd8d013b9f9d4af70cacdfae6eff2", version = "43.0.0", default-features = false }
+revm-state = { git = "https://github.com/Rimeeeeee/revm", rev = "693f8320e82cd8d013b9f9d4af70cacdfae6eff2", version = "43.0.0", default-features = false }
 
 # crypto
 secp256k1 = { version = "0.30", default-features = false, features = ["global-context", "recovery"] }
