@@ -63,11 +63,11 @@ jobs:
           fallback: none
       - name: build
         if: ${{ matrix.rust == '1.94.1' }} # MSRV
-        run: cargo build --workspace ${{ matrix.flags }}
+        run: cargo build --workspace --locked ${{ matrix.flags }}
       - name: test
         shell: bash
         if: ${{ matrix.rust != '1.94.1' }} # MSRV
-        run: cargo nextest run --workspace ${{ matrix.flags }}
+        run: cargo nextest run --workspace --locked ${{ matrix.flags }}
 
   doctest:
     permissions:
@@ -87,8 +87,8 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
-      - run: cargo test --workspace --doc
-      - run: cargo test --all-features --workspace --doc
+      - run: cargo test --workspace --locked --doc
+      - run: cargo test --all-features --locked --workspace --doc
 
   feature-checks:
     permissions:
@@ -115,7 +115,7 @@ jobs:
         with:
           cache-on-failure: true
       - name: cargo hack
-        run: cargo hack check --feature-powerset --depth 1
+        run: cargo hack check --locked --feature-powerset --depth 1
 
   check-no-std:
     permissions:
@@ -164,11 +164,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
-      - run: cargo +nightly clippy --workspace --all-targets --all-features
+      - run: cargo +nightly clippy --workspace --locked --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
       # Exercise the sealed account-extension bound with revm's payload disabled.
-      - run: cargo +nightly clippy --workspace --all-targets --features reth-primitives-traits/reth-codec,reth-primitives-traits/serde,reth-primitives-traits/arbitrary
+      - run: cargo +nightly clippy --workspace --locked --all-targets --features reth-primitives-traits/reth-codec,reth-primitives-traits/serde,reth-primitives-traits/arbitrary
         env:
           RUSTFLAGS: -Dwarnings
 
@@ -191,7 +191,7 @@ jobs:
         with:
           cache-on-failure: true
       - name: Build documentation
-        run: cargo doc --workspace --all-features --no-deps --document-private-items
+        run: cargo doc --workspace --locked --all-features --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition -Zunstable-options
 
