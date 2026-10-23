@@ -4,8 +4,10 @@ use alloy_genesis::GenesisAccount;
 use alloy_primitives::{keccak256, Bytes, B256, U256};
 use alloy_trie::TrieAccount;
 use derive_more::Deref;
-use revm_bytecode::{Bytecode as RevmBytecode, BytecodeDecodeError};
-use revm_state::AccountInfo;
+use evm2::{
+    bytecode::{self, BytecodeDecodeError},
+    evm::AccountInfo,
+};
 
 #[cfg(feature = "reth-codec")]
 /// Identifiers used in [`Compact`](reth_codecs::Compact) encoding of [`Bytecode`].
@@ -262,23 +264,6 @@ impl Account {
             extension,
         }
     }
-
-    /// Extracts the account information from a [`revm_state::Account`]
-    pub fn from_revm_account(revm_account: &revm_state::Account) -> Self {
-        Self {
-            balance: revm_account.info.balance,
-            nonce: revm_account.info.nonce,
-            bytecode_hash: if revm_account.info.code_hash == revm_primitives::KECCAK_EMPTY {
-                None
-            } else {
-                Some(revm_account.info.code_hash)
-            },
-            #[cfg(feature = "account-ext")]
-            extension: alloy_trie::AccountExtension::from_shared(
-                revm_account.info.extension.clone().into_shared(),
-            ),
-        }
-    }
 }
 
 #[cfg(feature = "eip7928")]
@@ -300,13 +285,6 @@ impl Account {
             self.nonce = nonce;
         }
         self.bytecode_hash = info.code_hash.or(self.bytecode_hash).or(Some(KECCAK_EMPTY));
-    }
-}
-
-impl From<revm_state::Account> for Account {
-    #[inline]
-    fn from(value: revm_state::Account) -> Self {
-        Self::from(value.info)
     }
 }
 
@@ -340,30 +318,28 @@ impl InMemorySize for Account {
 
 /// Bytecode for an account.
 ///
-/// A wrapper around [`revm::primitives::Bytecode`][RevmBytecode] with encoding/decoding support.
+/// A wrapper around [`evm2::bytecode::Bytecode`] with encoding/decoding support.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deref)]
-pub struct Bytecode(pub RevmBytecode);
+pub struct Bytecode(pub bytecode::Bytecode);
 
 impl Bytecode {
     /// Create new bytecode from raw bytes.
     ///
-    /// No analysis will be performed.
-    ///
     /// # Panics
     ///
-    /// Panics if bytecode is EOF and has incorrect format.
+    /// Panics if EIP-7702 delegation bytecode has an incorrect format.
     #[inline]
     pub fn new_raw(bytes: Bytes) -> Self {
-        Self(RevmBytecode::new_raw(bytes))
+        Self(bytecode::Bytecode::new_raw(bytes))
     }
 
-    /// Creates a new raw [`revm_bytecode::Bytecode`].
+    /// Creates a new raw [`bytecode::Bytecode`].
     ///
-    /// Returns an error on incorrect Bytecode format.
+    /// Returns an error if EIP-7702 delegation bytecode has an incorrect format.
     #[inline]
     pub fn new_raw_checked(bytecode: Bytes) -> Result<Self, BytecodeDecodeError> {
-        RevmBytecode::new_raw_checked(bytecode).map(Self)
+        bytecode::Bytecode::new_raw_checked(bytecode).map(Self)
     }
 }
 
@@ -375,7 +351,7 @@ impl reth_codecs::Compact for Bytecode {
     {
         use compact_ids::{EIP7702_BYTECODE_ID, LEGACY_ANALYZED_BYTECODE_ID};
 
-        let bytecode = self.0.bytes_ref();
+        let bytecode = self.0.bytes();
         buf.put_u32(bytecode.len() as u32);
         buf.put_slice(bytecode.as_ref());
         let len = if self.0.is_legacy() {
@@ -396,10 +372,9 @@ impl reth_codecs::Compact for Bytecode {
         len + bytecode.len() + 4
     }
 
-    // # Panics
-    //
-    // A panic will be triggered if a bytecode variant of 1 or greater than 2 is passed from the
-    // database.
+    /// # Panics
+    ///
+    /// Panics if the database contains malformed bytecode or a removed or unknown variant.
     fn from_compact(mut buf: &[u8], _: usize) -> (Self, &[u8]) {
         use byteorder::ReadBytesExt;
         use bytes::Buf;
@@ -411,7 +386,7 @@ impl reth_codecs::Compact for Bytecode {
         let bytes = Bytes::from(buf.copy_to_bytes(len));
         let variant = buf.read_u8().expect("could not read bytecode variant");
         let decoded = match variant {
-            LEGACY_RAW_BYTECODE_ID => Self(RevmBytecode::new_raw(bytes)),
+            LEGACY_RAW_BYTECODE_ID => Self(bytecode::Bytecode::new_raw(bytes)),
             REMOVED_BYTECODE_ID => {
                 unreachable!("Junk data in database: checked Bytecode variant was removed")
             }
@@ -427,19 +402,21 @@ impl reth_codecs::Compact for Bytecode {
                     // Otherwise, use original_len
                     original_len
                 };
-                // SAFETY: jump table is constructed from the persisted bitvec and the bytecode
-                // length matches; this is the inverse of the original `to_compact` encoding.
+                // SAFETY: persisted legacy code includes STOP padding and completes trailing
+                // immediate data. The bitmap belongs to these bytes, so the
+                // existing compact format meets evm2's analyzed-code invariants
+                // without reanalysis or changing its padding.
                 Self(unsafe {
-                    RevmBytecode::new_analyzed(
+                    bytecode::Bytecode::new_analyzed(
                         bytes,
                         original_len,
-                        revm_bytecode::JumpTable::from_slice(buf, jump_table_len),
+                        bytecode::JumpTable::from_slice(buf, jump_table_len),
                     )
                 })
             }
             EIP7702_BYTECODE_ID => {
                 // EIP-7702 bytecode objects will be decoded from the raw bytecode
-                Self(RevmBytecode::new_raw(bytes))
+                Self(bytecode::Bytecode::new_raw(bytes))
             }
             _ => unreachable!("Junk data in database: unknown Bytecode variant"),
         };
@@ -463,26 +440,28 @@ impl From<&GenesisAccount> for Account {
 }
 
 impl From<AccountInfo> for Account {
-    fn from(revm_acc: AccountInfo) -> Self {
+    fn from(evm_account: AccountInfo) -> Self {
         Self {
-            balance: revm_acc.balance,
-            nonce: revm_acc.nonce,
-            bytecode_hash: (!revm_acc.is_empty_code_hash()).then_some(revm_acc.code_hash),
+            balance: evm_account.balance,
+            nonce: evm_account.nonce,
+            bytecode_hash: (evm_account.code_hash != KECCAK_EMPTY).then_some(evm_account.code_hash),
             #[cfg(feature = "account-ext")]
-            extension: alloy_trie::AccountExtension::from_shared(revm_acc.extension.into_shared()),
+            extension: alloy_trie::AccountExtension::from_shared(
+                evm_account.extension.into_shared(),
+            ),
         }
     }
 }
 
 impl From<&AccountInfo> for Account {
-    fn from(revm_acc: &AccountInfo) -> Self {
+    fn from(evm_account: &AccountInfo) -> Self {
         Self {
-            balance: revm_acc.balance,
-            nonce: revm_acc.nonce,
-            bytecode_hash: (!revm_acc.is_empty_code_hash()).then_some(revm_acc.code_hash),
+            balance: evm_account.balance,
+            nonce: evm_account.nonce,
+            bytecode_hash: (evm_account.code_hash != KECCAK_EMPTY).then_some(evm_account.code_hash),
             #[cfg(feature = "account-ext")]
             extension: alloy_trie::AccountExtension::from_shared(
-                revm_acc.extension.clone().into_shared(),
+                evm_account.extension.clone().into_shared(),
             ),
         }
     }
@@ -495,9 +474,9 @@ impl From<Account> for AccountInfo {
             nonce: reth_acc.nonce,
             code_hash: reth_acc.bytecode_hash.unwrap_or(KECCAK_EMPTY),
             code: None,
-            account_id: None,
+            _non_exhaustive: (),
             #[cfg(feature = "account-ext")]
-            extension: revm_state::AccountExtension::from_shared(reth_acc.extension.into_shared()),
+            extension: evm2::evm::AccountExtension::from_shared(reth_acc.extension.into_shared()),
         }
     }
 }
@@ -555,7 +534,6 @@ mod tests {
     use alloc::vec::Vec;
     use alloy_primitives::{hex_literal::hex, B256, U256};
     use reth_codecs::Compact;
-    use revm_bytecode::JumpTable;
 
     #[test]
     fn empty_extension_preserves_compact() {
@@ -582,9 +560,9 @@ mod tests {
         };
         assert!(!account.is_empty());
         let pointer = account.extension.as_ptr();
-        let revm = AccountInfo::from(account.clone());
-        assert_eq!(revm.extension.as_ptr(), pointer);
-        let restored = Account::from(revm);
+        let native = AccountInfo::from(account.clone());
+        assert_eq!(native.extension.as_ptr(), pointer);
+        let restored = Account::from(native);
         assert_eq!(restored.extension.as_ptr(), pointer);
         assert_eq!(restored, account);
         let trie = account.clone().into_trie_account(alloy_trie::EMPTY_ROOT_HASH);
@@ -644,33 +622,63 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_bytecode() {
-        let mut buf = vec![];
-        let bytecode = Bytecode::new_raw(Bytes::default());
-        let len = bytecode.to_compact(&mut buf);
-        assert_eq!(len, 14);
+        for raw in [
+            Bytes::new(),
+            Bytes::from_static(&[0xff, 0xff]),
+            Bytes::from_static(&[0x60, 0x00, 0x5b]),
+            Bytes::from_static(&[0x7f, 0x01]),
+            bytecode::Bytecode::new_eip7702(alloy_primitives::Address::with_last_byte(1))
+                .original_bytes(),
+        ] {
+            let bytecode = Bytecode::new_raw(raw.clone());
+            let mut buf = Vec::new();
+            let len = bytecode.to_compact(&mut buf);
+            assert_eq!(len, buf.len());
+            let (decoded, remainder) = Bytecode::from_compact(&buf, len);
+            assert_eq!(decoded.original_bytes(), raw);
+            assert_eq!(decoded.hash_slow(), bytecode.hash_slow());
+            assert_eq!(decoded.0.bytes(), bytecode.0.bytes());
+            assert_eq!(decoded.legacy_jump_table(), bytecode.legacy_jump_table());
+            assert!(remainder.is_empty());
+        }
+    }
 
-        let mut buf = vec![];
-        let bytecode = Bytecode::new_raw(Bytes::from(&hex!("ffff")));
-        let len = bytecode.to_compact(&mut buf);
-        assert_eq!(len, 17);
+    #[test]
+    fn historical_bytecode_records_keep_padding_and_jump_destinations() {
+        // These records use the existing compact layout: padded bytes, variant, original
+        // length, and the jump bitmap. They include both padded-length and original-length maps.
+        let truncated_push =
+            [&[0, 0, 0, 34][..], &[0x7f, 0x01], &[0; 32], &[2], &2u64.to_be_bytes(), &[0]].concat();
+        for (encoded, original) in [
+            (truncated_push, hex!("7f01").to_vec()),
+            (hex!("0000000100020000000000000000").to_vec(), Vec::new()),
+            (hex!("0000000460005b0002000000000000000304").to_vec(), hex!("60005b").to_vec()),
+            (hex!("00000003ffff0002000000000000000200").to_vec(), hex!("ffff").to_vec()),
+        ] {
+            let (decoded, remainder) = Bytecode::from_compact(&encoded, encoded.len());
+            assert_eq!(decoded.original_byte_slice(), original);
+            assert_eq!(decoded.hash_slow(), keccak256(&original));
+            if original == hex!("60005b") {
+                assert!(decoded.legacy_jump_table().unwrap().is_valid(2));
+                assert!(!decoded.legacy_jump_table().unwrap().is_valid(1));
+            }
+            let mut reencoded = Vec::new();
+            decoded.to_compact(&mut reencoded);
+            assert_eq!(reencoded, encoded);
+            assert!(remainder.is_empty());
+        }
+    }
 
-        let mut buf = vec![];
-        // SAFETY: hand-crafted analyzed bytecode used purely for round-trip testing.
-        let bytecode = Bytecode(unsafe {
-            RevmBytecode::new_analyzed(
-                Bytes::from(&hex!("ff00")),
-                2,
-                JumpTable::from_slice(&[0], 2),
-            )
-        });
-        let len = bytecode.to_compact(&mut buf);
-        assert_eq!(len, 16);
-
-        let (decoded, remainder) = Bytecode::from_compact(&buf, len);
-        assert_eq!(decoded, bytecode);
-        assert!(remainder.is_empty());
+    #[test]
+    fn native_account_conversions_preserve_code_hashes() {
+        for code_hash in [KECCAK_EMPTY, B256::ZERO, B256::repeat_byte(7)] {
+            let native =
+                AccountInfo { balance: U256::from(42), nonce: 3, code_hash, ..Default::default() };
+            let account = Account::from(&native);
+            assert_eq!(account, Account::from(native.clone()));
+            assert_eq!(AccountInfo::from(account), native);
+        }
     }
 
     #[test]
