@@ -42,7 +42,7 @@ mod tests {
         eip2718::Decodable2718,
         eip8141::{Frame, FrameLimits, FrameMode},
     };
-    use alloy_primitives::{Address, Bytes};
+    use alloy_primitives::{Address, Bytes, U256};
 
     #[test]
     fn frame_transaction_roundtrip() {
@@ -64,6 +64,35 @@ mod tests {
 
         assert_eq!(decoded, tx);
         assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn devnet_two_fields_preserve_compact_bytes_and_remainder() {
+        for nonce_keys in [
+            None,
+            Some(vec![]),
+            Some(vec![U256::ZERO]),
+            Some(vec![U256::ZERO, U256::from(1)]),
+        ] {
+            let tx = TxEip8141 {
+                nonce: 7,
+                nonce_keys,
+                fees: alloy_eips::eip8141::TransactionFees {
+                    max_fee: U256::MAX,
+                    max_priority_fee_per_gas: U256::from(u128::MAX) + U256::from(1),
+                },
+                frames: vec![Frame { mode: FrameMode::Assert, ..Default::default() }],
+                ..Default::default()
+            };
+            let mut encoded = Vec::new();
+            let len = tx.to_compact(&mut encoded);
+            assert_eq!(encoded, tx.encoded_2718());
+            encoded.extend_from_slice(&[0xaa, 0xbb]);
+            let (decoded, remaining) = TxEip8141::from_compact(&encoded, len);
+            assert_eq!(decoded, tx);
+            assert_eq!(decoded.signature_hash(), tx.signature_hash());
+            assert_eq!(remaining, &[0xaa, 0xbb]);
+        }
     }
     #[test]
     fn overflowing_frame_budgets_preserve_compact_encoding() {

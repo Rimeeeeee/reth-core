@@ -805,7 +805,8 @@ mod tests {
     }
 
     #[cfg(test)]
-    #[test_fuzz::test_fuzz]
+    // test-fuzz corpus paths contain module separators that Windows rejects.
+    #[cfg_attr(not(windows), test_fuzz::test_fuzz)]
     fn compact_test_enum_all_variants(var0: TestEnum, var1: TestEnum, var2: TestEnum) {
         let mut buf = vec![];
         var0.to_compact(&mut buf);
