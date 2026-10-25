@@ -21,6 +21,7 @@ alloy-consensus = { workspace = true, optional = true }
 alloy-eips = { workspace = true, optional = true, features = ["serde"] }
 alloy-genesis = { workspace = true, optional = true }
 alloy-primitives.workspace = true
+alloy-rlp = { workspace = true, optional = true }
 alloy-trie = { workspace = true, optional = true }
 
 # misc
@@ -51,6 +52,7 @@ std = [
     "bytes/std",
     "alloy-consensus?/std",
     "alloy-eips?/std",
+    "alloy-rlp?/std",
     "alloy-genesis?/std",
     "alloy-trie?/std",
     "serde/std",
@@ -60,6 +62,7 @@ std = [
 alloy = [
     "dep:alloy-consensus",
     "dep:alloy-eips",
+    "dep:alloy-rlp",
     "dep:alloy-genesis",
     "dep:alloy-trie",
     "dep:reth-zstd-compressors",

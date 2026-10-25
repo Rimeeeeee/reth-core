@@ -1,11 +1,23 @@
-//! Compact implementation for [`AlloyEthereumReceipt`]
+//! Compact implementations for Alloy receipt types.
 
 use crate::Compact;
 use alloc::vec::Vec;
-use alloy_consensus::EthereumReceipt as AlloyEthereumReceipt;
+use alloy_consensus::{
+    EthereumReceipt as AlloyEthereumReceipt, FrameReceiptEnvelope,
+    ReceiptEnvelope as AlloyReceiptEnvelope, TxType,
+};
+use alloy_eips::eip8141::FRAME_TX_TYPE;
 use alloy_primitives::Log;
-use bytes::Buf;
+use alloy_rlp::{Decodable, Encodable};
+use bytes::{Buf, BufMut};
 use modular_bitfield::prelude::*;
+
+/// Discriminator for the EIP-8141 receipt envelope compact encoding.
+///
+/// `0xff` is not a valid [`ReceiptFlags`] value: it would require a three-byte transaction type
+/// and a fifteen-byte `u64`. Existing receipt encodings can therefore continue using their
+/// unchanged compact representation.
+const EIP8141_COMPACT_IDENTIFIER: u8 = u8::MAX;
 
 #[allow(non_snake_case)]
 mod flags {
@@ -103,10 +115,88 @@ impl<T: Compact> Compact for AlloyEthereumReceipt<T> {
     }
 }
 
+impl Compact for AlloyReceiptEnvelope {
+    fn to_compact<B>(&self, buf: &mut B) -> usize
+    where
+        B: BufMut + AsMut<[u8]>,
+    {
+        match self {
+            AlloyReceiptEnvelope::Legacy(receipt) => {
+                standard(TxType::Legacy, &receipt.receipt).to_compact(buf)
+            }
+            AlloyReceiptEnvelope::Eip2930(receipt) => {
+                standard(TxType::Eip2930, &receipt.receipt).to_compact(buf)
+            }
+            AlloyReceiptEnvelope::Eip1559(receipt) => {
+                standard(TxType::Eip1559, &receipt.receipt).to_compact(buf)
+            }
+            AlloyReceiptEnvelope::Eip4844(receipt) => {
+                standard(TxType::Eip4844, &receipt.receipt).to_compact(buf)
+            }
+            AlloyReceiptEnvelope::Eip7702(receipt) => {
+                standard(TxType::Eip7702, &receipt.receipt).to_compact(buf)
+            }
+            AlloyReceiptEnvelope::Eip8141(receipt) => receipt.to_compact(buf),
+        }
+    }
+
+    fn from_compact(buf: &[u8], len: usize) -> (Self, &[u8]) {
+        if buf.first() == Some(&EIP8141_COMPACT_IDENTIFIER) {
+            let (receipt, buf) = FrameReceiptEnvelope::from_compact(buf, len);
+            return (Self::Eip8141(receipt), buf)
+        }
+
+        let (receipt, buf) = AlloyEthereumReceipt::<TxType>::from_compact(buf, len);
+        (
+            AlloyReceiptEnvelope::try_from(receipt)
+                .expect("standard receipt conversion cannot fail"),
+            buf,
+        )
+    }
+}
+
+impl Compact for FrameReceiptEnvelope {
+    fn to_compact<B>(&self, buf: &mut B) -> usize
+    where
+        B: BufMut + AsMut<[u8]>,
+    {
+        buf.put_u8(EIP8141_COMPACT_IDENTIFIER);
+        buf.put_u8(FRAME_TX_TYPE);
+        self.encode(buf);
+        self.length() + 2
+    }
+
+    fn from_compact(buf: &[u8], len: usize) -> (Self, &[u8]) {
+        let encoded = buf.get(..len).expect("EIP-8141 compact receipt length exceeds input");
+        let (prefix, mut encoded) = encoded
+            .split_first_chunk::<2>()
+            .expect("EIP-8141 compact receipt is missing its discriminator");
+        assert_eq!(
+            *prefix,
+            [EIP8141_COMPACT_IDENTIFIER, FRAME_TX_TYPE],
+            "invalid EIP-8141 compact receipt discriminator"
+        );
+        let receipt = Self::decode(&mut encoded)
+            .expect("invalid EIP-8141 receipt in compact database encoding");
+        assert!(encoded.is_empty(), "trailing bytes in EIP-8141 compact receipt");
+        (receipt, &buf[len..])
+    }
+}
+
+fn standard(tx_type: TxType, receipt: &alloy_consensus::Receipt) -> AlloyEthereumReceipt {
+    AlloyEthereumReceipt {
+        tx_type,
+        success: receipt.status.coerce_status(),
+        cumulative_gas_used: receipt.cumulative_gas_used,
+        logs: receipt.logs.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_consensus::TxType;
+    use alloy_eips::eip8141::{FrameGasUsed, FrameReceipt, FrameReceiptPayload, FrameStatus};
+    use alloy_primitives::Address;
     use proptest::proptest;
     use proptest_arbitrary_interop::arb;
 
@@ -118,5 +208,69 @@ mod tests {
             let (decoded, _) = AlloyEthereumReceipt::<TxType>::from_compact(&compacted_receipt, len);
             assert_eq!(receipt, decoded)
         }
+    }
+
+    #[test]
+    fn non_frame_envelope_preserves_existing_compact_encoding() {
+        let receipt = AlloyEthereumReceipt {
+            tx_type: TxType::Eip1559,
+            success: true,
+            cumulative_gas_used: 21_000,
+            logs: vec![Log::default()],
+        };
+        let envelope = AlloyReceiptEnvelope::try_from(receipt.clone()).unwrap();
+        let mut receipt_buf = Vec::new();
+        let mut envelope_buf = Vec::new();
+
+        let receipt_len = receipt.to_compact(&mut receipt_buf);
+        let envelope_len = envelope.to_compact(&mut envelope_buf);
+        let (decoded, _) = AlloyReceiptEnvelope::from_compact(&envelope_buf, envelope_len);
+
+        assert_eq!(envelope_buf, receipt_buf);
+        assert_eq!(envelope_len, receipt_len);
+        assert_eq!(decoded, envelope);
+    }
+
+    #[test]
+    fn frame_receipt_envelope_roundtrip() {
+        let envelope = AlloyReceiptEnvelope::Eip8141(
+            FrameReceiptPayload {
+                cumulative_gas_used: 42_000,
+                payer: Address::repeat_byte(0x11),
+                frame_receipts: vec![
+                    FrameReceipt {
+                        status: FrameStatus::Success,
+                        gas_used: FrameGasUsed { execution: 21_000, state: 0 },
+                        logs: vec![Log::default()],
+                    },
+                    FrameReceipt {
+                        status: FrameStatus::SkippedAtomicBatch,
+                        gas_used: FrameGasUsed::default(),
+                        logs: Vec::new(),
+                    },
+                ],
+            }
+            .into(),
+        );
+        let mut compact = Vec::new();
+
+        let len = envelope.to_compact(&mut compact);
+        let (decoded, remaining) = AlloyReceiptEnvelope::from_compact(&compact, len);
+
+        assert_eq!(compact.first(), Some(&EIP8141_COMPACT_IDENTIFIER));
+        assert_eq!(decoded, envelope);
+        assert!(remaining.is_empty());
+
+        let AlloyReceiptEnvelope::Eip8141(frame) = &envelope else { unreachable!() };
+        let mut expected = vec![0xff, 0x06];
+        expected.extend(alloy_rlp::encode(frame.payload()));
+        assert_eq!(compact, expected);
+        let mut direct = Vec::new();
+        assert_eq!(frame.to_compact(&mut direct), len);
+        assert_eq!(direct, compact);
+        direct.extend_from_slice(&[0xaa, 0xbb]);
+        let (decoded, remaining) = FrameReceiptEnvelope::from_compact(&direct, len);
+        assert_eq!(&decoded, frame);
+        assert_eq!(remaining, &[0xaa, 0xbb]);
     }
 }
