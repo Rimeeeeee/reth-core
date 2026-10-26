@@ -51,8 +51,8 @@ pub trait SignedTransaction:
     /// hashes, e.g. because they missing context (e.g. blob sidecar).
     #[inline]
     fn is_broadcastable_in_full(&self) -> bool {
-        // EIP-4844 transactions are not broadcastable in full, only hashes are allowed.
-        !self.is_eip4844()
+        // Blob sidecars must be fetched through pooled transaction requests.
+        !self.is_eip4844() && self.blob_count().unwrap_or_default() == 0
     }
 
     /// Recover signer from signature and hash.
@@ -143,4 +143,80 @@ impl<T> SignedTransaction for T where
         + TxHashRef
         + IsTyped2718
 {
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_consensus::{
+        EthereumTxEnvelope, SignableTransaction, TxEip1559, TxEip2930, TxEip4844, TxEip7702,
+        TxEip8141, TxLegacy,
+    };
+    use alloy_primitives::{Sealable, Signature};
+
+    #[test]
+    fn full_broadcast_excludes_transactions_requiring_blob_sidecars() {
+        let transactions = [
+            (
+                EthereumTxEnvelope::Legacy(
+                    TxLegacy::default().into_signed(Signature::test_signature()),
+                ),
+                true,
+            ),
+            (
+                EthereumTxEnvelope::Eip2930(
+                    TxEip2930::default().into_signed(Signature::test_signature()),
+                ),
+                true,
+            ),
+            (
+                EthereumTxEnvelope::Eip1559(
+                    TxEip1559::default().into_signed(Signature::test_signature()),
+                ),
+                true,
+            ),
+            (
+                EthereumTxEnvelope::Eip7702(
+                    TxEip7702::default().into_signed(Signature::test_signature()),
+                ),
+                true,
+            ),
+            (EthereumTxEnvelope::Eip8141(TxEip8141::default().seal_slow()), true),
+            (
+                EthereumTxEnvelope::Eip8141(
+                    TxEip8141 {
+                        blob_versioned_hashes: alloc::vec![B256::repeat_byte(1)],
+                        ..Default::default()
+                    }
+                    .seal_slow(),
+                ),
+                false,
+            ),
+            (
+                EthereumTxEnvelope::Eip4844(
+                    TxEip4844::default().into_signed(Signature::test_signature()),
+                ),
+                false,
+            ),
+            (
+                EthereumTxEnvelope::Eip4844(
+                    TxEip4844 {
+                        blob_versioned_hashes: alloc::vec![B256::repeat_byte(1)],
+                        ..Default::default()
+                    }
+                    .into_signed(Signature::test_signature()),
+                ),
+                false,
+            ),
+        ];
+
+        for (transaction, expected) in transactions {
+            assert_eq!(
+                transaction.is_broadcastable_in_full(),
+                expected,
+                "{:?}",
+                transaction.tx_type()
+            );
+        }
+    }
 }
