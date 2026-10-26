@@ -21,13 +21,13 @@ reth-zstd-compressors = { version = "0.8.2", path = "crates/zstd-compressors", d
 # eth/alloy
 alloy-primitives = { version = "1.5.6", default-features = false, features = ["map-foldhash"] }
 alloy-rlp = { version = "0.3.13", default-features = false, features = ["core-net"] }
-alloy-rpc-types-eth = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b", version = "2.5.0", default-features = false }
+alloy-rpc-types-eth = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f", version = "2.5.0", default-features = false }
 alloy-trie = { version = "0.9.6", default-features = false }
-alloy-consensus = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b", version = "2.5.0", default-features = false }
-alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b", version = "2.5.0", default-features = false }
-alloy-network = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b", version = "2.5.0", default-features = false }
-alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b", version = "2.5.0", default-features = false }
-alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b", version = "2.5.0", default-features = false }
+alloy-consensus = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f", version = "2.5.0", default-features = false }
+alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f", version = "2.5.0", default-features = false }
+alloy-network = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f", version = "2.5.0", default-features = false }
+alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f", version = "2.5.0", default-features = false }
+alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f", version = "2.5.0", default-features = false }
 alloy-eip7928 = { version = "0.4.10", default-features = false }
 
 evm2 = { git = "https://github.com/Rimeeeeee/evm2", branch = "bogota-plan", default-features = false }
@@ -152,15 +152,16 @@ significant_drop_tightening = "allow"
 too_long_first_doc_paragraph = "allow"
 
 [patch.crates-io]
-alloy-consensus = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-consensus-any = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-json-rpc = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-network = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-network-primitives = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-rpc-types-any = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-rpc-types-eth = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-serde = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
-alloy-tx-macros = { git = "https://github.com/Rimeeeeee/alloy", rev = "a0ed8def1457698c626d8f372a2813d23ad18e5b" }
+alloy-eip7928 = { git = "https://github.com/Rimeeeeee/eips", rev = "eb1b963d6386c618bdb10b4216c801466f22b4eb" }
+alloy-consensus = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-consensus-any = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-eips = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-json-rpc = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-network = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-network-primitives = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-rpc-types-any = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-rpc-types-eth = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-serde = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
+alloy-tx-macros = { git = "https://github.com/Rimeeeeee/alloy", rev = "2b70648f1d8e2e3d35fc92a16e3d7036b52e2e1f" }
