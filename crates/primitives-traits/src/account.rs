@@ -341,6 +341,12 @@ impl Bytecode {
     pub fn new_raw_checked(bytecode: Bytes) -> Result<Self, BytecodeDecodeError> {
         bytecode::Bytecode::new_raw_checked(bytecode).map(Self)
     }
+
+    /// Creates legacy code without interpreting EIP-7702 delegation markers.
+    #[inline]
+    pub fn new_legacy(bytes: Bytes) -> Self {
+        Self(bytecode::Bytecode::new_legacy(bytes))
+    }
 }
 
 #[cfg(feature = "reth-codec")]
@@ -640,6 +646,27 @@ mod tests {
             assert_eq!(decoded.hash_slow(), bytecode.hash_slow());
             assert_eq!(decoded.0.bytes(), bytecode.0.bytes());
             assert_eq!(decoded.legacy_jump_table(), bytecode.legacy_jump_table());
+            assert!(remainder.is_empty());
+        }
+    }
+
+    #[test]
+    fn legacy_bytecode_preserves_invalid_delegation_markers() {
+        for (version, len) in [(0, 22), (0, 24), (1, 23)] {
+            let mut raw = vec![0; len];
+            raw[..3].copy_from_slice(&[0xef, 0x01, version]);
+            let raw = Bytes::from(raw);
+            assert!(Bytecode::new_raw_checked(raw.clone()).is_err());
+            let bytecode = Bytecode::new_legacy(raw.clone());
+            assert!(bytecode.is_legacy());
+            assert_eq!(bytecode.original_byte_slice(), raw.as_ref());
+            assert_eq!(bytecode.hash_slow(), keccak256(&raw));
+            let mut encoded = Vec::new();
+            let len = bytecode.to_compact(&mut encoded);
+            let (decoded, remainder) = Bytecode::from_compact(&encoded, len);
+            assert!(decoded.is_legacy());
+            assert_eq!(decoded.original_byte_slice(), raw.as_ref());
+            assert_eq!(decoded.hash_slow(), bytecode.hash_slow());
             assert!(remainder.is_empty());
         }
     }
