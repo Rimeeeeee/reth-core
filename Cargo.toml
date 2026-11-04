@@ -30,7 +30,7 @@ alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "5cfb4a1554c3
 alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", rev = "5cfb4a1554c3b792221a8ba2debce1182f60d759", version = "2.5.0", default-features = false }
 alloy-eip7928 = { version = "0.4.10", default-features = false }
 
-evm2 = { git = "https://github.com/Rimeeeeee/evm2", branch = "bogota-plan", default-features = false }
+evm2 = { git = "https://github.com/Rimeeeeee/evm2", rev = "b637fb01cf5563d8fe0f2a05411adb7b01d16d67", default-features = false }
 
 # crypto
 secp256k1 = { version = "0.30", default-features = false, features = ["global-context", "recovery"] }
@@ -106,7 +106,7 @@ manual_clamp = "warn"
 manual_is_variant_and = "warn"
 manual_string_new = "warn"
 match_same_arms = "warn"
-missing-const-for-fn = "warn"
+missing_const_for_fn = "warn"
 mutex_integer = "warn"
 naive_bytecount = "warn"
 needless_bitwise_bool = "warn"
