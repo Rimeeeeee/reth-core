@@ -1,6 +1,7 @@
 //! Compact implementation for [`AlloyHeader`]
 
 use crate::Compact;
+use alloc::boxed::Box;
 use alloy_consensus::Header as AlloyHeader;
 use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, U256};
 use reth_codecs_derive::{add_arbitrary_tests, generate_tests};
@@ -63,16 +64,30 @@ pub(crate) struct HeaderExt {
     requests_hash: Option<B256>,
     block_access_list_hash: Option<B256>,
     slot_number: Option<u64>,
+    recursive_stark: Option<HeaderProof>,
+}
+
+/// Compact form of the EIP-8288 header entry.
+#[cfg_attr(
+    any(test, feature = "test-utils"),
+    derive(serde::Serialize, serde::Deserialize, arbitrary::Arbitrary)
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Compact)]
+#[reth_codecs(crate = "crate")]
+struct HeaderProof {
+    block_deps_hash: B256,
+    stark_proof: Bytes,
 }
 
 impl HeaderExt {
     /// Converts into [`Some`] if any of the field exists. Otherwise, returns [`None`].
     ///
     /// Required since [`Header`] uses `Option<HeaderExt>` as a field.
-    const fn into_option(self) -> Option<Self> {
+    fn into_option(self) -> Option<Self> {
         if self.requests_hash.is_some() ||
             self.block_access_list_hash.is_some() ||
-            self.slot_number.is_some()
+            self.slot_number.is_some() ||
+            self.recursive_stark.is_some()
         {
             Some(self)
         } else {
@@ -90,6 +105,10 @@ impl Compact for AlloyHeader {
             requests_hash: self.requests_hash,
             block_access_list_hash: self.block_access_list_hash,
             slot_number: self.slot_number,
+            recursive_stark: self.recursive_stark.as_ref().map(|proof| HeaderProof {
+                stark_proof: proof.stark_proof.clone(),
+                block_deps_hash: proof.block_deps_hash,
+            }),
         };
 
         let header = Header {
@@ -146,6 +165,16 @@ impl Compact for AlloyHeader {
                 .as_ref()
                 .and_then(|h| h.block_access_list_hash),
             slot_number: header.extra_fields.as_ref().and_then(|h| h.slot_number),
+            recursive_stark: header
+                .extra_fields
+                .as_ref()
+                .and_then(|fields| fields.recursive_stark.as_ref())
+                .map(|proof| {
+                    Box::new(alloy_eips::eip8288::RecursiveStark {
+                        stark_proof: proof.stark_proof.clone(),
+                        block_deps_hash: proof.block_deps_hash,
+                    })
+                }),
             extra_data: header.extra_data,
         };
         (alloy_header, buf)
@@ -159,6 +188,22 @@ mod tests {
     use super::*;
     use alloy_consensus::EMPTY_OMMER_ROOT_HASH;
     use alloy_primitives::{address, b256, bloom, bytes, hex};
+
+    #[test]
+    fn recursive_stark_roundtrip() {
+        let header = AlloyHeader {
+            recursive_stark: Some(Box::new(alloy_eips::eip8288::RecursiveStark {
+                stark_proof: Bytes::from_static(&[1, 2, 3]),
+                block_deps_hash: B256::repeat_byte(7),
+            })),
+            ..Default::default()
+        };
+        let mut encoded = Vec::new();
+        let len = header.to_compact(&mut encoded);
+        let (decoded, rest) = AlloyHeader::from_compact(&encoded, len);
+        assert_eq!(decoded, header);
+        assert!(rest.is_empty());
+    }
 
     /// Holesky block #1947953
     const HOLESKY_BLOCK: Header = Header {
@@ -211,6 +256,7 @@ mod tests {
             requests_hash: Some(B256::random()),
             block_access_list_hash: None,
             slot_number: None,
+            recursive_stark: None,
         });
 
         let mut encoded_header = vec![];
