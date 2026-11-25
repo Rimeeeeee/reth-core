@@ -492,6 +492,14 @@ impl<B: Block> BlockHeader for RecoveredBlock<B> {
         self.header().slot_number()
     }
 
+    fn dependency_proof_hash(&self) -> Option<B256> {
+        self.header().dependency_proof_hash()
+    }
+
+    fn block_deps_hash(&self) -> Option<B256> {
+        self.header().block_deps_hash()
+    }
+
     #[inline]
     fn extra_data(&self) -> &Bytes {
         self.header().extra_data()
