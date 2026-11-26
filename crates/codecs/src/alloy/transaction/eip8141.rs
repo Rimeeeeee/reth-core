@@ -5,12 +5,16 @@ use alloy_consensus::TxEip8141;
 use alloy_eips::{eip2718::Encodable2718, eip8141::FRAME_TX_TYPE};
 use alloy_rlp::Header;
 
+/// The proof-frame envelope is incompatible with Devnet 2 signature-list records.
+const FRAME_COMPACT_VERSION: u8 = 1;
+
 impl Compact for TxEip8141 {
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
         B: bytes::BufMut + AsMut<[u8]>,
     {
-        let len = self.encode_2718_len();
+        let len = 1 + self.encode_2718_len();
+        buf.put_u8(FRAME_COMPACT_VERSION);
         self.encode_2718(buf);
         len
     }
@@ -18,6 +22,9 @@ impl Compact for TxEip8141 {
     fn from_compact(buf: &[u8], len: usize) -> (Self, &[u8]) {
         let mut encoded =
             buf.get(..len).expect("EIP-8141 compact transaction length exceeds input");
+        let (&version, rest) = encoded.split_first().expect("empty frame compact record");
+        assert_eq!(version, FRAME_COMPACT_VERSION, "unsupported frame compact encoding version");
+        encoded = rest;
         // Compact storage must roundtrip structurally representable transactions, including
         // old test vectors with overflowing aggregate gas. Network admission validates budgets
         // independently; applying that validation here breaks the existing database encoding.
@@ -65,6 +72,13 @@ mod tests {
         assert_eq!(decoded, tx);
         assert!(remaining.is_empty());
     }
+    #[test]
+    #[should_panic(expected = "unsupported frame compact encoding version")]
+    fn rejects_devnet_two_records() {
+        let encoded = TxEip8141::default().encoded_2718();
+        TxEip8141::from_compact(&encoded, encoded.len());
+    }
+
     #[test]
     fn overflowing_frame_budgets_preserve_compact_encoding() {
         for limits in [
