@@ -27,7 +27,6 @@ alloy-trie = { workspace = true, optional = true }
 # misc
 bytes.workspace = true
 modular-bitfield.workspace = true
-parity-scale-codec = { workspace = true, optional = true }
 visibility = { workspace = true, optional = true }
 serde.workspace = true
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -43,6 +42,7 @@ arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true
 proptest-arbitrary-interop.workspace = true
 rstest.workspace = true
+parity-scale-codec.workspace = true
 
 [features]
 account-ext = ["alloy-genesis?/account-ext"]
@@ -57,7 +57,6 @@ std = [
     "alloy-trie?/std",
     "serde/std",
     "reth-zstd-compressors?/std",
-    "dep:parity-scale-codec",
 ]
 alloy = [
     "dep:alloy-consensus",

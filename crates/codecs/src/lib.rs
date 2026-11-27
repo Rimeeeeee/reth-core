@@ -71,6 +71,16 @@ pub mod __private;
 /// change and will lead to a new, incompatible [`Compact`] implementation. Implementers must take
 /// special care when changing or rearranging fields.
 pub trait Compact: Sized {
+    /// Internal opt-in for stack buffering by the derive macro.
+    ///
+    /// `Some(n)` guarantees that both encoding methods write at most `n` bytes and that
+    /// their bytes and return values do not depend on the destination buffer's type,
+    /// contents, or capacity. Existing/custom implementations retain the heap-buffered
+    /// path by default. This is an upper bound on bytes written, not on the return value
+    /// (for example, `bool` writes no bytes but returns a flag).
+    #[doc(hidden)]
+    const __COMPACT_MAX_SIZE: Option<usize> = None;
+
     /// Takes a buffer which can be written to. *Ideally*, it returns the length written to.
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
@@ -115,6 +125,8 @@ impl Compact for alloc::string::String {
     }
 }
 
+// References retain the original derive path: method-call autoderef can select T's
+// specialized encoder, while trait dispatch to &T uses its default implementation.
 impl<T: Compact> Compact for &T {
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
@@ -132,6 +144,8 @@ impl<T: Compact> Compact for &T {
 pub type CompactPlaceholder = ();
 
 impl Compact for CompactPlaceholder {
+    const __COMPACT_MAX_SIZE: Option<usize> = Some(0);
+
     #[inline]
     fn to_compact<B>(&self, _: &mut B) -> usize
     where
@@ -150,6 +164,8 @@ macro_rules! impl_uint_compact {
     ($($name:tt),+) => {
         $(
             impl Compact for $name {
+                const __COMPACT_MAX_SIZE: Option<usize> = Some(core::mem::size_of::<$name>());
+
                 #[inline]
                 fn to_compact<B>(&self, buf: &mut B) -> usize
                     where B: bytes::BufMut + AsMut<[u8]>
@@ -177,7 +193,31 @@ macro_rules! impl_uint_compact {
 
 impl_uint_compact!(u8, u64, u128);
 
+/// `usize` is encoded as an unsigned LEB128 varint, the same encoding used for the length
+/// prefixes of `Vec` and `Option` values.
+///
+/// The encoding is self-delimiting: `to_compact` returns the number of bytes written and
+/// `from_compact` ignores `len`.
+impl Compact for usize {
+    const __COMPACT_MAX_SIZE: Option<Self> = Some((Self::BITS as Self).div_ceil(7));
+
+    #[inline]
+    fn to_compact<B>(&self, buf: &mut B) -> usize
+    where
+        B: bytes::BufMut + AsMut<[u8]>,
+    {
+        encode_varuint(*self, buf)
+    }
+
+    #[inline]
+    fn from_compact(buf: &[u8], _len: usize) -> (Self, &[u8]) {
+        decode_varuint(buf)
+    }
+}
+
 impl Compact for NonZeroU64 {
+    const __COMPACT_MAX_SIZE: Option<usize> = Some(8);
+
     #[inline]
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
@@ -265,9 +305,24 @@ where
         for element in *self {
             tmp.clear();
 
-            // We don't know the length until we compact it
-            let length = element.to_compact(&mut tmp);
-            encode_varuint(length, buf);
+            // Prefix with the bytes actually written, not the returned metadata: some types return
+            // flags (`Option`, `bool`) or 0 (`Vec`, `String`). For types returning their byte
+            // length the encoding is unchanged. The decoder passes this byte count as `len`, so
+            // `T::from_compact` must ignore `len` or accept the byte count (`Option` treats any
+            // nonzero `len` as `Some`). Types that read `len` as an identifier (`Signature`,
+            // `TxType`) cannot be framed this way and are rejected below.
+            let metadata = element.to_compact(&mut tmp);
+            if metadata != tmp.len() {
+                // Only reached for metadata-returning types, so byte-length types pay nothing.
+                let (decoded, _) = T::from_compact(&tmp, tmp.len());
+                let mut reencoded = Vec::with_capacity(tmp.len());
+                assert!(
+                    decoded.to_compact(&mut reencoded) == metadata && reencoded == tmp,
+                    "Compact element whose decoding depends on its returned metadata ({metadata}) \
+                     cannot be framed in a Vec"
+                );
+            }
+            encode_varuint(tmp.len(), buf);
 
             buf.put_slice(&tmp);
         }
@@ -303,6 +358,13 @@ impl<T> Compact for Option<T>
 where
     T: Compact,
 {
+    // A full-width varint bounds the prefix even when T returns a flag rather than a size.
+    // This bound also covers specialized_to_compact, which omits the prefix.
+    const __COMPACT_MAX_SIZE: Option<usize> = match T::__COMPACT_MAX_SIZE {
+        Some(size) => size.checked_add((usize::BITS as usize).div_ceil(7)),
+        None => None,
+    };
+
     /// Returns 0 for `None` and 1 for `Some(_)`.
     #[inline]
     fn to_compact<B>(&self, buf: &mut B) -> usize
@@ -388,6 +450,8 @@ impl<T: Compact + ToOwned<Owned = T>> Compact for Cow<'_, T> {
 }
 
 impl Compact for U256 {
+    const __COMPACT_MAX_SIZE: Option<usize> = Some(32);
+
     #[inline]
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
@@ -430,6 +494,8 @@ impl Compact for Bytes {
 }
 
 impl<const N: usize> Compact for [u8; N] {
+    const __COMPACT_MAX_SIZE: Option<usize> = Some(N);
+
     #[inline]
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
@@ -477,6 +543,8 @@ macro_rules! impl_compact_for_wrapped_bytes {
 impl_compact_for_wrapped_bytes!(Address, Bloom);
 
 impl<const N: usize> Compact for FixedBytes<N> {
+    const __COMPACT_MAX_SIZE: Option<usize> = Some(N);
+
     #[inline]
     fn to_compact<B>(&self, buf: &mut B) -> usize
     where
@@ -493,6 +561,8 @@ impl<const N: usize> Compact for FixedBytes<N> {
 }
 
 impl Compact for bool {
+    const __COMPACT_MAX_SIZE: Option<usize> = Some(0);
+
     /// `bool` vars go directly to the `StructFlags` and are not written to the buffer.
     #[inline]
     fn to_compact<B>(&self, _: &mut B) -> usize
@@ -509,15 +579,19 @@ impl Compact for bool {
     }
 }
 
-fn encode_varuint<B>(mut n: usize, buf: &mut B)
+/// Writes `n` as an unsigned LEB128 varint and returns the number of bytes written.
+fn encode_varuint<B>(mut n: usize, buf: &mut B) -> usize
 where
     B: bytes::BufMut + AsMut<[u8]>,
 {
+    let mut written = 1;
     while n >= 0x80 {
         buf.put_u8((n as u8) | 0x80);
         n >>= 7;
+        written += 1;
     }
     buf.put_u8(n as u8);
+    written
 }
 
 fn decode_varuint(buf: &[u8]) -> (usize, &[u8]) {
@@ -545,11 +619,95 @@ const fn decode_varuint_panic() -> ! {
 mod tests {
     use super::*;
     use alloc::vec;
-    use alloy_primitives::B256;
+    use alloy_primitives::{hex, B256};
+    use bytes::BytesMut;
     use serde::{Deserialize, Serialize};
 
     fn nz(value: u64) -> NonZeroU64 {
         NonZeroU64::new(value).expect("test value must be non-zero")
+    }
+
+    fn vec_roundtrip<T: Compact + PartialEq + core::fmt::Debug>(list: Vec<T>) -> Vec<u8> {
+        let mut buf = vec![];
+        list.to_compact(&mut buf);
+        let (decoded, rest) = Vec::<T>::from_compact(&buf, buf.len());
+        assert_eq!(decoded, list);
+        assert!(rest.is_empty());
+        buf
+    }
+
+    #[test]
+    fn compact_vec_flag_returning_elements_roundtrip() {
+        vec_roundtrip(vec![String::new(), "reth".to_string()]);
+        vec_roundtrip(vec![vec![], vec![1u8, 2], vec![]]);
+        vec_roundtrip(vec![vec![1u64], vec![]]);
+        vec_roundtrip(vec![Some(1u64), None, Some(0)]);
+        vec_roundtrip(vec![false]);
+        vec_roundtrip(vec![TestEnum::Var2(7), TestEnum::Var0, TestEnum::Var2(0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "alloy")]
+    #[should_panic(expected = "cannot be framed")]
+    fn compact_vec_rejects_identifier_element() {
+        use alloy_primitives::{Signature, U256};
+        vec![Signature::new(U256::from(1), U256::from(2), false)].to_compact(&mut vec![]);
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot be framed")]
+    fn compact_vec_rejects_unframeable_element() {
+        vec![true].to_compact(&mut vec![]);
+    }
+
+    /// Encodings of `Vec<T>` whose elements return their byte length must not change.
+    #[test]
+    #[cfg(feature = "alloy")]
+    fn compact_vec_golden_bytes() {
+        use alloy_eips::{
+            eip2930::AccessListItem, eip4895::Withdrawal, eip7702::SignedAuthorization,
+        };
+        use alloy_primitives::{Address, U256};
+
+        let buf = vec_roundtrip(vec![0u64, 1, 0x1234]);
+        assert_eq!(hex::encode(buf), "03000101021234");
+
+        // The only flag-returning element that round-tripped before the fix.
+        let buf = vec_roundtrip(vec![Some(0u64)]);
+        assert_eq!(hex::encode(buf), "010100");
+
+        let buf = vec_roundtrip(vec![
+            Withdrawal {
+                index: 1,
+                validator_index: 0,
+                address: Address::repeat_byte(0xaa),
+                amount: 0x100,
+            },
+            Withdrawal::default(),
+        ]);
+        assert_eq!(hex::encode(buf), "0219010201aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01001600000000000000000000000000000000000000000000");
+
+        let buf = vec_roundtrip(vec![
+            AccessListItem {
+                address: Address::repeat_byte(1),
+                storage_keys: vec![B256::repeat_byte(2)],
+            },
+            AccessListItem::default(),
+        ]);
+        assert_eq!(hex::encode(buf), "0235010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020215000000000000000000000000000000000000000000");
+
+        let auth = alloy_eips::eip7702::Authorization {
+            chain_id: U256::from(1),
+            address: Address::repeat_byte(3),
+            nonce: 7,
+        };
+        let buf = vec_roundtrip(vec![SignedAuthorization::new_unchecked(
+            auth,
+            1,
+            U256::from(5),
+            U256::from(6),
+        )]);
+        assert_eq!(hex::encode(buf), "01590105000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000410001030303030303030303030303030303030303030307");
     }
 
     #[test]
@@ -590,6 +748,38 @@ mod tests {
 
         // B256 shouldn't care about the len passed, since it's not actually compacted.
         assert_eq!(B256::from_compact(&buf, 1000), (B256::ZERO, vec![1u8].as_slice()));
+    }
+
+    #[test]
+    fn compact_usize() {
+        fn check(value: usize, expected: &[u8]) {
+            let mut buf = vec![];
+            assert_eq!(value.to_compact(&mut buf), expected.len());
+            assert_eq!(buf, expected);
+
+            // Add some noise data.
+            buf.push(1);
+
+            // usize is self-delimiting, so the len passed is ignored.
+            assert_eq!(usize::from_compact(&buf, 1000), (value, vec![1u8].as_slice()));
+        }
+
+        check(0, &[0x00]);
+        check(127, &[0x7f]);
+        check(128, &[0x80, 0x01]);
+        check(300, &[0xac, 0x02]);
+        #[cfg(target_pointer_width = "64")]
+        check(usize::MAX, &[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01]);
+    }
+
+    #[test]
+    fn compress_b512() {
+        use alloy_primitives::B512;
+
+        let value = B512::repeat_byte(0xab);
+        assert_eq!(value.uncompressable_ref(), Some(value.as_slice()));
+        assert_eq!(value.compress(), value.to_vec());
+        assert_eq!(B512::decompress(&value.compress()).unwrap(), value);
     }
 
     #[test]
@@ -790,6 +980,66 @@ mod tests {
             TestStruct::from_compact(&buf, buf.len()),
             (TestStruct::default(), vec![].as_slice())
         );
+    }
+
+    #[test]
+    fn compact_stack_buffers() {
+        #[derive(Debug, PartialEq, Compact)]
+        #[reth_codecs(crate = "crate")]
+        struct Value {
+            nonce: u64,
+            balance: U256,
+            bytecode_hash: Option<B256>,
+        }
+
+        #[derive(Debug, Compact)]
+        #[reth_codecs(crate = "crate")]
+        struct ValueRef<'a> {
+            nonce: &'a u64,
+            balance: &'a U256,
+            bytecode_hash: &'a Option<B256>,
+        }
+
+        let value = Value {
+            nonce: 0x1234,
+            balance: U256::from(1),
+            bytecode_hash: Some(B256::repeat_byte(0xab)),
+        };
+        let expected = [hex!("1204123401").as_slice(), &[0xab; 32]].concat();
+        let mut vec = vec![0xff; 3];
+        assert_eq!(value.to_compact(&mut vec), expected.len());
+        assert_eq!(&vec[..3], &[0xff; 3]);
+        assert_eq!(&vec[3..], expected);
+
+        let borrowed = ValueRef {
+            nonce: &value.nonce,
+            balance: &value.balance,
+            bytecode_hash: &value.bytecode_hash,
+        };
+        let mut borrowed_buf = Vec::new();
+        assert_eq!(borrowed.to_compact(&mut borrowed_buf), expected.len());
+        assert_eq!(borrowed_buf, expected);
+
+        let mut bytes = BytesMut::from(&vec[..3]);
+        assert_eq!(value.to_compact(&mut bytes), expected.len());
+        assert_eq!(&bytes[..], vec);
+
+        let mut storage = [0xa5; 40];
+        let mut slice = storage.as_mut_slice();
+        assert_eq!(value.to_compact(&mut slice), expected.len());
+        assert_eq!(slice, &[0xa5; 3]);
+        assert_eq!(&storage[..expected.len()], expected);
+        let (decoded, remaining) = Value::from_compact(&storage, expected.len());
+        assert_eq!(decoded, value);
+        assert_eq!(remaining, &[0xa5; 3]);
+
+        // As before, a short destination receives the flags before the payload write panics.
+        let mut short = [0xa5; 3];
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            value.to_compact(&mut short.as_mut_slice())
+        }));
+        assert!(result.is_err());
+        assert_eq!(short, [0x12, 0x04, 0xa5]);
     }
 
     #[derive(
