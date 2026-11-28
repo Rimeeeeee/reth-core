@@ -113,22 +113,12 @@ impl Compact for AlloyReceiptEnvelope {
         B: BufMut + AsMut<[u8]>,
     {
         match self {
-            AlloyReceiptEnvelope::Legacy(receipt) => {
-                standard(TxType::Legacy, &receipt.receipt).to_compact(buf)
-            }
-            AlloyReceiptEnvelope::Eip2930(receipt) => {
-                standard(TxType::Eip2930, &receipt.receipt).to_compact(buf)
-            }
-            AlloyReceiptEnvelope::Eip1559(receipt) => {
-                standard(TxType::Eip1559, &receipt.receipt).to_compact(buf)
-            }
-            AlloyReceiptEnvelope::Eip4844(receipt) => {
-                standard(TxType::Eip4844, &receipt.receipt).to_compact(buf)
-            }
-            AlloyReceiptEnvelope::Eip7702(receipt) => {
-                standard(TxType::Eip7702, &receipt.receipt).to_compact(buf)
-            }
-            AlloyReceiptEnvelope::Eip8141(receipt) => receipt.to_compact(buf),
+            Self::Legacy(receipt) => standard(TxType::Legacy, &receipt.receipt).to_compact(buf),
+            Self::Eip2930(receipt) => standard(TxType::Eip2930, &receipt.receipt).to_compact(buf),
+            Self::Eip1559(receipt) => standard(TxType::Eip1559, &receipt.receipt).to_compact(buf),
+            Self::Eip4844(receipt) => standard(TxType::Eip4844, &receipt.receipt).to_compact(buf),
+            Self::Eip7702(receipt) => standard(TxType::Eip7702, &receipt.receipt).to_compact(buf),
+            Self::Eip8141(receipt) => receipt.to_compact(buf),
         }
     }
 
@@ -139,11 +129,7 @@ impl Compact for AlloyReceiptEnvelope {
         }
 
         let (receipt, buf) = AlloyEthereumReceipt::<TxType>::from_compact(buf, len);
-        (
-            AlloyReceiptEnvelope::try_from(receipt)
-                .expect("standard receipt conversion cannot fail"),
-            buf,
-        )
+        (Self::try_from(receipt).expect("standard receipt conversion cannot fail"), buf)
     }
 }
 
