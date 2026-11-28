@@ -1845,7 +1845,7 @@ dependencies = [
 [[package]]
 name = "evm2"
 version = "0.1.0"
-source = "git+https://github.com/Rimeeeeee/evm2?rev=68c9a04c0f658b4b6ba033907103cfd3c6de1524#68c9a04c0f658b4b6ba033907103cfd3c6de1524"
+source = "git+https://github.com/Rimeeeeee/evm2?rev=b75ee09ef470fa0dd589b1fc55426763d9eb9c9c#b75ee09ef470fa0dd589b1fc55426763d9eb9c9c"
 dependencies = [
  "lean-sphincs",
  "alloy-consensus",
@@ -1884,7 +1884,7 @@ dependencies = [
 [[package]]
 name = "evm2-macros"
 version = "0.1.0"
-source = "git+https://github.com/Rimeeeeee/evm2?rev=68c9a04c0f658b4b6ba033907103cfd3c6de1524#68c9a04c0f658b4b6ba033907103cfd3c6de1524"
+source = "git+https://github.com/Rimeeeeee/evm2?rev=b75ee09ef470fa0dd589b1fc55426763d9eb9c9c#b75ee09ef470fa0dd589b1fc55426763d9eb9c9c"
 dependencies = [
  "proc-macro2",
  "quote",

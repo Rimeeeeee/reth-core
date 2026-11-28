@@ -30,7 +30,7 @@ alloy-signer = { git = "https://github.com/Rimeeeeee/alloy", rev = "853c61fc0abd
 alloy-genesis = { git = "https://github.com/Rimeeeeee/alloy", rev = "853c61fc0abd365ce98fe50fbfd54412db0b308d", version = "2.6.1", default-features = false }
 alloy-eip7928 = { version = "0.4.10", default-features = false }
 
-evm2 = { git = "https://github.com/Rimeeeeee/evm2", rev = "68c9a04c0f658b4b6ba033907103cfd3c6de1524", default-features = false }
+evm2 = { git = "https://github.com/Rimeeeeee/evm2", rev = "b75ee09ef470fa0dd589b1fc55426763d9eb9c9c", default-features = false }
 
 # misc
 bytes = { version = "1.11.1", default-features = false }
