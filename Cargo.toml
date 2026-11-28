@@ -21,16 +21,16 @@ reth-zstd-compressors = { version = "0.8.2", path = "crates/zstd-compressors", d
 # eth/alloy
 alloy-primitives = { version = "1.5.6", default-features = false, features = ["map-foldhash"] }
 alloy-rlp = { version = "0.3.13", default-features = false, features = ["core-net"] }
-alloy-rpc-types-eth = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369", version = "2.6.1", default-features = false }
+alloy-rpc-types-eth = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51", version = "2.6.1", default-features = false }
 alloy-trie = { version = "0.9.6", default-features = false }
-alloy-consensus = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369", version = "2.6.1", default-features = false }
-alloy-eips = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369", version = "2.6.1", default-features = false }
-alloy-network = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369", version = "2.6.1", default-features = false }
-alloy-signer = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369", version = "2.6.1", default-features = false }
-alloy-genesis = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369", version = "2.6.1", default-features = false }
+alloy-consensus = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51", version = "2.6.1", default-features = false }
+alloy-eips = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51", version = "2.6.1", default-features = false }
+alloy-network = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51", version = "2.6.1", default-features = false }
+alloy-signer = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51", version = "2.6.1", default-features = false }
+alloy-genesis = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51", version = "2.6.1", default-features = false }
 alloy-eip7928 = { git = "https://github.com/Rimeeeeee/eips", rev = "4a3bd1ad1964ff9eb37c8b0b8668ac7bdab1d01c", version = "0.4.10", default-features = false }
 
-evm2 = { git = "https://github.com/Soubhik-10/evm2", rev = "deafd62509a082127dda455f5ea35bf9f4d29b18", default-features = false }
+evm2 = { git = "https://github.com/Soubhik-10/evm2", rev = "073795a83428d48db96dc6b980664b35a26650ec", default-features = false }
 
 # misc
 bytes = { version = "1.11.1", default-features = false }
@@ -149,15 +149,15 @@ too_long_first_doc_paragraph = "allow"
 
 [patch.crates-io]
 alloy-eip7928 = { git = "https://github.com/Rimeeeeee/eips", rev = "4a3bd1ad1964ff9eb37c8b0b8668ac7bdab1d01c" }
-alloy-consensus = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-consensus-any = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-eips = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-genesis = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-json-rpc = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-network = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-network-primitives = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-rpc-types-any = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-rpc-types-eth = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-serde = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-signer = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
-alloy-tx-macros = { git = "https://github.com/Soubhik-10/alloy", rev = "59bd1a05c82d140bab01190d1234af6a1dacf369" }
+alloy-consensus = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-consensus-any = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-eips = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-genesis = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-json-rpc = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-network = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-network-primitives = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-rpc-types-any = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-rpc-types-eth = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-serde = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-signer = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
+alloy-tx-macros = { git = "https://github.com/Soubhik-10/alloy", rev = "56061d204259990f75f4be92fb278fd3ce016a51" }
